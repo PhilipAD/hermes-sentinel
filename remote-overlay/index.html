@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hermes Sentinel — Overlay</title>
+<style>
+  :root {
+    --bg: rgba(10, 14, 22, 0.92);
+    --fg: #e7eef9;
+    --muted: #8a96a8;
+    --accent: #67e8a4;
+    --accent-dim: #2f9b6a;
+    --warn: #ffb86b;
+    --err: #ff6b88;
+    --card: rgba(28, 36, 50, 0.72);
+    --border: rgba(255, 255, 255, 0.08);
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    --radius: 12px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: var(--fg);
+    background: linear-gradient(160deg, #0a0e16 0%, #0f1422 50%, #0b101a 100%);
+    -webkit-font-smoothing: antialiased;
+  }
+  #app {
+    width: min(420px, 100vw);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    backdrop-filter: blur(14px);
+    border-left: 1px solid var(--border);
+    position: relative;
+    margin: 0 auto;
+  }
+  header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0, 0, 0, 0.25);
+  }
+  header h1 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
+  .pill {
+    font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05); color: var(--muted);
+  }
+  .pill.live { color: var(--accent); border: 1px solid var(--accent-dim); }
+  .pill.dead { color: var(--err); border: 1px solid rgba(255, 107, 136, 0.4); }
+  .pill.connecting { color: var(--warn); border: 1px solid rgba(255, 184, 107, 0.4); }
+  .icon-btn {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 4px 8px; cursor: pointer; font: inherit;
+  }
+  .icon-btn:hover { color: var(--fg); border-color: rgba(255,255,255,0.2); }
+  .icon-btn.active { color: var(--accent); border-color: var(--accent-dim); }
+
+  .toolbar {
+    padding: 8px 14px; border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  select, input[type=text], input[type=password] {
+    background: rgba(0,0,0,0.35); border: 1px solid var(--border);
+    color: var(--fg); border-radius: 8px; padding: 4px 8px; font: inherit; flex: 1; min-width: 0;
+  }
+  button.primary {
+    background: var(--accent-dim); color: #04140a; border: none;
+    border-radius: 8px; padding: 5px 10px; cursor: pointer; font-weight: 600; font: inherit;
+  }
+  button.secondary {
+    background: transparent; color: var(--muted); border: 1px solid var(--border);
+    border-radius: 8px; padding: 5px 10px; cursor: pointer; font: inherit;
+  }
+  button.danger { background: rgba(255,107,136,0.18); color: var(--err); border: 1px solid rgba(255,107,136,0.3); }
+
+  .toggles { display: flex; gap: 4px; flex-wrap: wrap; }
+  .toggle {
+    cursor: pointer; user-select: none; font-size: 11px;
+    padding: 3px 8px; border-radius: 8px; border: 1px solid var(--border);
+    color: var(--muted); background: transparent;
+  }
+  .toggle.on {
+    background: rgba(103, 232, 164, 0.12);
+    border-color: rgba(103, 232, 164, 0.4); color: var(--accent);
+  }
+
+  /* ---- Audio control bar ---- */
+  .audio-bar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.18);
+  }
+  .audio-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    cursor: pointer; user-select: none; font: inherit; font-size: 11px;
+    padding: 4px 9px; border-radius: 8px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted);
+  }
+  .audio-btn.active {
+    background: rgba(103,232,164,0.14); border-color: rgba(103,232,164,0.45);
+    color: var(--accent);
+  }
+  .audio-btn.muted {
+    background: rgba(255,107,136,0.16); border-color: rgba(255,107,136,0.45);
+    color: var(--err);
+  }
+  .volume-meter {
+    flex: 1; height: 6px; min-width: 40px; border-radius: 3px;
+    background: rgba(255,255,255,0.06); overflow: hidden; position: relative;
+  }
+  .volume-meter-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--accent-dim), var(--accent), var(--warn));
+    transition: width 80ms linear;
+  }
+
+  /* ---- Audio sources panel ---- */
+  .audio-sources-section {
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.12);
+  }
+  .audio-sources-section > summary {
+    cursor: pointer; padding: 6px 14px; font-size: 11px;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
+    list-style: none; display: flex; align-items: center; gap: 6px;
+  }
+  .audio-sources-section > summary::-webkit-details-marker { display: none; }
+  .audio-sources-section > summary::before { content: "▸"; font-size: 10px; }
+  .audio-sources-section[open] > summary::before { content: "▾"; }
+  .audio-sources-section .src-refresh {
+    margin-left: auto; background: transparent; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 2px 7px; cursor: pointer; font: inherit; font-size: 11px;
+  }
+  .audio-sources {
+    padding: 4px 14px 8px; display: flex; flex-direction: column; gap: 4px;
+    max-height: 160px; overflow-y: auto;
+  }
+  .audio-source-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 6px; border-radius: 6px;
+    background: rgba(255,255,255,0.02); border: 1px solid var(--border);
+    cursor: pointer; user-select: none;
+  }
+  .audio-source-item:hover { border-color: rgba(255,255,255,0.18); }
+  .audio-source-item input[type="checkbox"] { accent-color: var(--accent); margin: 0; }
+  .audio-source-item .src-icon { font-size: 14px; opacity: 0.85; }
+  .audio-source-item .src-name { flex: 1; font-size: 12px; color: var(--fg); }
+  .audio-source-item.disabled .src-name { opacity: 0.5; }
+  .audio-sources .empty { padding: 6px 4px; opacity: 0.5; font-size: 11px; }
+
+  main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  .pane { flex: 1; overflow-y: auto; padding: 10px 14px; }
+  .pane h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin: 6px 0;
+  }
+
+  .transcript-line {
+    margin: 4px 0; padding: 4px 8px; border-radius: 6px;
+    background: rgba(255,255,255,0.02); border-left: 2px solid transparent;
+  }
+  .transcript-line.mic    { border-left-color: #67e8a4; }
+  .transcript-line.system { border-left-color: #6ba6ff; }
+  .transcript-line.mixed  { border-left-color: #c39bff; }
+  .transcript-line .who {
+    font-size: 10px; color: var(--muted); text-transform: uppercase; margin-right: 6px;
+  }
+  .transcript-line.partial { opacity: 0.65; font-style: italic; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 10px; margin: 8px 0; box-shadow: var(--shadow);
+  }
+  .card .meta { font-size: 10px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; }
+  .card .body { white-space: pre-wrap; }
+  .card .actions { display: flex; gap: 6px; margin-top: 8px; justify-content: flex-end; }
+  .card .actions button {
+    background: transparent; color: var(--muted); border: 1px solid var(--border);
+    border-radius: 6px; padding: 3px 8px; cursor: pointer; font-size: 11px; font: inherit;
+  }
+  .card .actions button.primary { color: var(--accent); border-color: rgba(103,232,164,0.4); background: transparent; }
+
+  .ask { display: flex; gap: 6px; padding: 8px 14px; border-top: 1px solid var(--border); }
+  .ask input { flex: 1; }
+
+  #settings-panel {
+    position: absolute; inset: 0;
+    background: rgba(8,12,20,0.98); padding: 14px;
+    display: none; flex-direction: column; gap: 10px; z-index: 10;
+  }
+  #settings-panel.open { display: flex; }
+  #settings-panel label {
+    display: flex; flex-direction: column; gap: 4px;
+    color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  #settings-panel input, #settings-panel select { text-transform: none; }
+  footer {
+    padding: 6px 14px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 11px; display: flex; gap: 12px;
+  }
+  footer .stat b { color: var(--fg); font-weight: 600; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+  .empty { opacity: 0.5; padding: 12px; text-align: center; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🛰️ Sentinel</h1>
+    <span class="pill" id="conn-pill" style="margin-left:auto">offline</span>
+    <button class="icon-btn" id="mic-btn"      title="Toggle microphone capture (streams audio to backend)">🎙</button>
+    <button class="icon-btn" id="settings-btn" title="Settings">⚙︎</button>
+  </header>
+
+  <div class="toolbar">
+    <div class="row">
+      <select id="session-select"><option value="">— session —</option></select>
+      <button class="secondary" id="refresh-sessions" title="Refresh sessions">↻</button>
+    </div>
+    <div class="row toggles" id="ctx-toggles">
+      <button class="toggle on" data-ctx="docs">docs</button>
+      <button class="toggle on" data-ctx="persona">persona</button>
+      <button class="toggle on" data-ctx="goal">goal</button>
+      <button class="toggle on" data-ctx="history">history</button>
+    </div>
+  </div>
+
+  <div class="audio-bar" id="audio-bar">
+    <button class="audio-btn active" id="mic-mute-btn" title="Mute / unmute the microphone capture stream">✅ Mic</button>
+    <button class="audio-btn active" id="speaker-mute-btn" title="Mute / unmute the system audio (speaker) capture stream">✅ Speaker</button>
+    <div class="volume-meter" id="volume-meter" title="Live audio level">
+      <div class="volume-meter-fill" id="volume-fill"></div>
+    </div>
+  </div>
+
+  <details class="audio-sources-section" id="audio-sources-section">
+    <summary>
+      <span>Audio Sources</span>
+      <button class="src-refresh" id="refresh-sources-btn" title="Refresh source list">↻</button>
+    </summary>
+    <div class="audio-sources" id="audio-sources-list">
+      <div class="empty">No sources detected.</div>
+    </div>
+  </details>
+
+  <main>
+    <div class="pane" id="suggestions" style="flex:1;min-height:0">
+      <h3>Suggestions</h3>
+      <div id="sugg-list"><div class="empty">No suggestions yet.</div></div>
+    </div>
+    <div class="pane" id="transcript-pane" style="border-top:1px solid var(--border);max-height:45%;flex:0 0 auto">
+      <h3>Live transcript</h3>
+      <div id="transcript-list"></div>
+    </div>
+  </main>
+
+  <div class="ask">
+    <select id="ask-mode" style="flex:0 0 auto;max-width:120px">
+      <option value="freeform">freeform</option>
+      <option value="talking_points">talking pts</option>
+      <option value="reply">reply</option>
+      <option value="recap">recap</option>
+      <option value="objection">objection</option>
+    </select>
+    <input type="text" id="ask-input" placeholder="Ask the copilot…" />
+    <button class="primary" id="ask-btn">Ask</button>
+  </div>
+
+  <footer>
+    <span class="stat">backend: <b id="stat-backend">—</b></span>
+    <span class="stat">lat: <b id="stat-latency">—</b></span>
+    <span class="stat">audio: <b id="stat-audio">off</b></span>
+  </footer>
+
+  <div id="settings-panel">
+    <h3 style="margin:0">Settings</h3>
+    <label>Backend URL (ws://…/ws or http://…)
+      <input id="cfg-url" type="text" placeholder="ws://127.0.0.1:18765/ws" />
+    </label>
+    <label>API key (optional)
+      <input id="cfg-key" type="password" placeholder="overlay.api_key" />
+    </label>
+    <label>Realtime backend
+      <select id="cfg-backend">
+        <option value="openai">openai</option>
+        <option value="grok">grok</option>
+        <option value="assemblyai">assemblyai</option>
+        <option value="deepgram">deepgram</option>
+        <option value="gemini">gemini</option>
+        <option value="local">local</option>
+      </select>
+    </label>
+    <label>Default suggestion mode
+      <select id="cfg-mode">
+        <option value="freeform">freeform</option>
+        <option value="talking_points">talking_points</option>
+        <option value="reply">reply</option>
+        <option value="recap">recap</option>
+        <option value="objection">objection</option>
+      </select>
+    </label>
+    <label>VAD sensitivity
+      <input id="cfg-vad" type="range" min="0" max="100" value="50" />
+    </label>
+    <div class="row" style="margin-top:auto;justify-content:flex-end">
+      <button class="secondary" id="cfg-cancel">Cancel</button>
+      <button class="primary"   id="cfg-save">Save & reconnect</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ---------- Config persistence ----------
+const LS_KEY = 'sentinel_overlay_cfg_v1';
+const params = new URLSearchParams(location.search);
+
+function defaultUrl() {
+  if (params.get('sentinel')) {
+    const u = params.get('sentinel').replace(/^http/, 'ws').replace(/\/$/, '');
+    return u + '/ws';
+  }
+  if (location.protocol === 'file:') return 'ws://127.0.0.1:18765/ws';
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return proto + '//' + location.host + '/ws';
+}
+const defaults = {
+  url: defaultUrl(),
+  apiKey: params.get('api_key') || '',
+  backend: 'openai',
+  mode: 'freeform',
+  vad: 50,
+  contexts: { docs: true, persona: true, goal: true, history: true },
+};
+let cfg = Object.assign({}, defaults, JSON.parse(localStorage.getItem(LS_KEY) || '{}'));
+cfg.contexts = Object.assign({}, defaults.contexts, cfg.contexts || {});
+function saveCfg(){ localStorage.setItem(LS_KEY, JSON.stringify(cfg)); }
+
+function httpBase() {
+  // Derive HTTP base from WS URL for REST calls.
+  return cfg.url.replace(/^ws/, 'http').replace(/\/ws(\?.*)?$/, '');
+}
+
+// ---------- DOM refs ----------
+const $ = (s) => document.querySelector(s);
+const connPill   = $('#conn-pill');
+const micBtn     = $('#mic-btn');
+const settingsBtn= $('#settings-btn');
+const settingsPanel = $('#settings-panel');
+const sessionSel = $('#session-select');
+const ctxToggles = $('#ctx-toggles');
+const suggList   = $('#sugg-list');
+const trList     = $('#transcript-list');
+const statBackend= $('#stat-backend');
+const statLatency= $('#stat-latency');
+const statAudio  = $('#stat-audio');
+const micMuteBtn      = $('#mic-mute-btn');
+const speakerMuteBtn  = $('#speaker-mute-btn');
+const volumeFill      = $('#volume-fill');
+const sourcesList     = $('#audio-sources-list');
+const refreshSourcesBtn = $('#refresh-sources-btn');
+
+// Per-source enable map: { source_id: bool }.
+let audioSources = [];           // [{id, name, icon, enabled}]
+let muteState = { mic: false, system: false };
+
+// ---------- WebSocket ----------
+let ws = null;
+let lastPing = 0;
+let reconnectTimer = null;
+
+function setConn(state) {
+  connPill.className = 'pill ' + state;
+  connPill.textContent = state === 'live' ? 'connected'
+    : state === 'connecting' ? 'connecting…' : 'offline';
+}
+
+function buildWsUrl() {
+  let url = cfg.url;
+  if (cfg.apiKey) url += (url.includes('?') ? '&' : '?') + 'api_key=' + encodeURIComponent(cfg.apiKey);
+  return url;
+}
+
+function send(obj) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+  try { ws.send(JSON.stringify(obj)); return true; } catch (_) { return false; }
+}
+
+function connect() {
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  if (ws) try { ws.close(); } catch(_){}
+  setConn('connecting');
+  try { ws = new WebSocket(buildWsUrl()); }
+  catch (e) {
+    setConn('dead');
+    reconnectTimer = setTimeout(connect, 3000);
+    return;
+  }
+  ws.onopen = () => {
+    setConn('live');
+    send({ kind: 'request_status' });
+    send({ kind: 'overlay_hello', client: 'remote-overlay', ts: Date.now() });
+    pushContexts();
+    send({ kind: 'list_sessions' });
+  };
+  ws.onclose = () => { setConn('dead'); reconnectTimer = setTimeout(connect, 2000); };
+  ws.onerror = () => {};
+  ws.onmessage = (e) => onMessage(e.data);
+}
+
+function onMessage(raw) {
+  let msg;
+  try { msg = JSON.parse(raw); } catch (e) { return; }
+  switch (msg.kind || msg.type) {
+    case 'pong':
+      if (lastPing) statLatency.textContent = (Date.now() - lastPing) + 'ms';
+      break;
+    case 'status':
+      renderStatus(msg.state);
+      break;
+    case 'suggestion':
+      addSuggestion(msg);
+      break;
+    case 'transcript':
+    case 'transcript_delta':
+      addTranscript(msg);
+      break;
+    case 'sessions':
+      renderSessions(msg.sessions || []);
+      break;
+    case 'overlay_command':
+      // Reserved for Tauri wrapper; web overlay ignores show/hide/position.
+      break;
+    case 'audio_sources_list':
+      renderAudioSources(msg.sources || []);
+      break;
+    case 'audio_level':
+      if (typeof msg.level === 'number') {
+        const pct = Math.max(0, Math.min(100, Math.round(msg.level * 100)));
+        volumeFill.style.width = pct + '%';
+      }
+      break;
+    case 'error':
+      console.warn('sentinel error:', msg.message || msg);
+      break;
+  }
+}
+
+setInterval(() => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    lastPing = Date.now();
+    send({ kind: 'ping' });
+  }
+}, 5000);
+
+// ---------- Rendering ----------
+function renderStatus(state) {
+  if (!state) { statBackend.textContent = '—'; return; }
+  statBackend.textContent = state.backend || '—';
+  if (state.session_id) {
+    let opt = sessionSel.querySelector('option[value="' + CSS.escape(state.session_id) + '"]');
+    if (!opt) {
+      opt = document.createElement('option');
+      opt.value = state.session_id;
+      opt.textContent = (state.meeting_id || state.session_id).slice(0, 32);
+      sessionSel.appendChild(opt);
+    }
+    if (!sessionSel.value) sessionSel.value = state.session_id;
+  }
+  if (typeof state.mic_muted === 'boolean') {
+    muteState.mic = state.mic_muted;
+    applyMuteUI('mic');
+  }
+  if (typeof state.system_muted === 'boolean') {
+    muteState.system = state.system_muted;
+    applyMuteUI('system');
+  }
+  if (Array.isArray(state.audio_sources)) {
+    renderAudioSources(state.audio_sources);
+  }
+  if (typeof state.audio_level === 'number') {
+    const pct = Math.max(0, Math.min(100, Math.round(state.audio_level * 100)));
+    volumeFill.style.width = pct + '%';
+  }
+}
+
+// ---------- Audio mute / sources ----------
+function sendAudioMute(channel, muted) {
+  send({ type: 'audio_mute', kind: 'audio_mute', channel, muted });
+}
+function sendAudioSourceFilter(sources) {
+  send({ type: 'audio_source_filter', kind: 'audio_source_filter', sources });
+}
+function sendAudioLevelSnap() {
+  send({ type: 'audio_sources_request', kind: 'audio_sources_request' });
+}
+
+function applyMuteUI(channel) {
+  const muted = !!muteState[channel];
+  const btn = channel === 'mic' ? micMuteBtn : speakerMuteBtn;
+  const label = channel === 'mic' ? 'Mic' : 'Speaker';
+  btn.classList.toggle('muted', muted);
+  btn.classList.toggle('active', !muted);
+  btn.textContent = (muted ? '❌ ' : '✅ ') + label;
+}
+
+function renderAudioSources(sources) {
+  audioSources = sources.slice();
+  if (!sources.length) {
+    sourcesList.innerHTML = '<div class="empty">No sources detected.</div>';
+    return;
+  }
+  sourcesList.innerHTML = '';
+  for (const s of sources) {
+    const enabled = s.enabled !== false;
+    const row = document.createElement('label');
+    row.className = 'audio-source-item' + (enabled ? '' : ' disabled');
+    row.dataset.id = s.id;
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = enabled;
+    cb.addEventListener('change', () => {
+      const map = {};
+      for (const item of sourcesList.querySelectorAll('.audio-source-item')) {
+        const id = item.dataset.id;
+        const c  = item.querySelector('input[type="checkbox"]');
+        map[id] = !!(c && c.checked);
+        item.classList.toggle('disabled', !(c && c.checked));
+      }
+      sendAudioSourceFilter(map);
+    });
+    const icon = document.createElement('span');
+    icon.className = 'src-icon';
+    icon.textContent = s.icon ? iconFor(s.icon) : '🔊';
+    const name = document.createElement('span');
+    name.className = 'src-name';
+    name.textContent = s.name || s.id || 'unknown';
+    row.append(cb, icon, name);
+    sourcesList.appendChild(row);
+  }
+}
+
+function iconFor(key) {
+  const map = {
+    chrome: '🌐', firefox: '🦊', safari: '🧭', edge: '🌐',
+    music: '🎵', spotify: '🎧', slack: '💬', discord: '🎮',
+    zoom: '📞', meet: '🎥', teams: '🟣', mic: '🎙', speaker: '🔊',
+  };
+  return map[(key || '').toLowerCase()] || '🔊';
+}
+
+function renderSessions(sessions) {
+  const cur = sessionSel.value;
+  sessionSel.innerHTML = '<option value="">— session —</option>';
+  for (const s of sessions) {
+    const o = document.createElement('option');
+    o.value = s.session_id;
+    o.textContent = (s.meeting_id || s.session_id).slice(0, 32) + (s.is_active ? ' •' : '');
+    sessionSel.appendChild(o);
+  }
+  if (cur) sessionSel.value = cur;
+}
+
+function addSuggestion(s) {
+  // Remove the "no suggestions yet" placeholder on first render.
+  const placeholder = suggList.querySelector('.empty');
+  if (placeholder) placeholder.remove();
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.dataset.id = s.id || ('sugg-' + Date.now());
+  const ts = (s.ts ? s.ts * 1000 : Date.now());
+  card.innerHTML = `
+    <div class="meta">${(s.mode || 'suggestion')} · ${new Date(ts).toLocaleTimeString()}</div>
+    <div class="body"></div>
+    <div class="actions">
+      <button class="dismiss">dismiss</button>
+      <button class="primary apply">apply</button>
+    </div>`;
+  card.querySelector('.body').textContent = s.text || '';
+  card.querySelector('.dismiss').onclick = () => {
+    card.remove();
+    send({ kind: 'suggestion_action', action: 'dismiss', id: card.dataset.id });
+  };
+  card.querySelector('.apply').onclick = () => {
+    card.style.opacity = '0.55';
+    send({ kind: 'suggestion_action', action: 'apply', id: card.dataset.id });
+  };
+  suggList.prepend(card);
+  while (suggList.children.length > 12) suggList.lastChild.remove();
+}
+
+function addTranscript(t) {
+  const text = t.text || '';
+  if (!text) return;
+  const div = document.createElement('div');
+  div.className = 'transcript-line ' + (t.channel || 'mixed') + (t.is_final === false ? ' partial' : '');
+  div.innerHTML = '<span class="who"></span><span class="text"></span>';
+  div.querySelector('.who').textContent = (t.speaker || t.channel || '?');
+  div.querySelector('.text').textContent = text;
+  trList.appendChild(div);
+  trList.parentElement.scrollTop = trList.parentElement.scrollHeight;
+  while (trList.children.length > 200) trList.firstChild.remove();
+}
+
+// ---------- Context toggles ----------
+function pushContexts() {
+  send({ kind: 'context_toggle', contexts: cfg.contexts });
+}
+ctxToggles.addEventListener('click', (e) => {
+  const t = e.target.closest('.toggle');
+  if (!t) return;
+  const key = t.dataset.ctx;
+  cfg.contexts[key] = !cfg.contexts[key];
+  t.classList.toggle('on', cfg.contexts[key]);
+  saveCfg();
+  pushContexts();
+});
+
+// ---------- Session select ----------
+sessionSel.addEventListener('change', () => {
+  send({ kind: 'session_switch', session_id: sessionSel.value });
+});
+$('#refresh-sessions').addEventListener('click', () => send({ kind: 'list_sessions' }));
+
+// ---------- Settings panel ----------
+function openSettings() {
+  $('#cfg-url').value = cfg.url;
+  $('#cfg-key').value = cfg.apiKey;
+  $('#cfg-backend').value = cfg.backend;
+  $('#cfg-mode').value = cfg.mode;
+  $('#cfg-vad').value = cfg.vad;
+  settingsPanel.classList.add('open');
+}
+function closeSettings(){ settingsPanel.classList.remove('open'); }
+settingsBtn.addEventListener('click', openSettings);
+$('#cfg-cancel').addEventListener('click', closeSettings);
+$('#cfg-save').addEventListener('click', () => {
+  cfg.url = $('#cfg-url').value.trim() || defaults.url;
+  cfg.apiKey = $('#cfg-key').value.trim();
+  cfg.backend = $('#cfg-backend').value;
+  cfg.mode    = $('#cfg-mode').value;
+  cfg.vad     = parseInt($('#cfg-vad').value, 10);
+  saveCfg();
+  closeSettings();
+  send({ kind: 'settings_update', settings: { backend: cfg.backend, mode: cfg.mode, vad: cfg.vad } });
+  $('#ask-mode').value = cfg.mode;
+  connect();
+});
+
+// ---------- Ask box ----------
+async function askCopilot() {
+  const q = $('#ask-input').value.trim();
+  if (!q) return;
+  const mode = $('#ask-mode').value;
+  // Prefer WebSocket when connected; fall back to REST.
+  const sent = send({ kind: 'suggest', query: q, mode });
+  if (!sent) {
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (cfg.apiKey) headers['Authorization'] = 'Bearer ' + cfg.apiKey;
+      await fetch(httpBase() + '/api/sentinel/suggest', {
+        method: 'POST', headers, body: JSON.stringify({ query: q, mode }),
+      });
+    } catch (e) { console.warn('ask failed', e); }
+  }
+  $('#ask-input').value = '';
+}
+$('#ask-btn').addEventListener('click', askCopilot);
+$('#ask-input').addEventListener('keydown', e => { if (e.key === 'Enter') askCopilot(); });
+
+// ---------- Mic capture ----------
+let micStream = null, audioCtx = null, micNode = null, processor = null;
+const TARGET_SR = 16000;
+
+function pcm16FromFloat32(input) {
+  const out = new Int16Array(input.length);
+  for (let i = 0; i < input.length; i++) {
+    const s = Math.max(-1, Math.min(1, input[i]));
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return out;
+}
+function downsampleTo16k(buf, srcRate) {
+  if (srcRate === TARGET_SR) return buf;
+  const ratio = srcRate / TARGET_SR;
+  const newLen = Math.round(buf.length / ratio);
+  const out = new Float32Array(newLen);
+  let off = 0, idx = 0;
+  while (off < newLen) {
+    const next = Math.round((off + 1) * ratio);
+    let acc = 0, n = 0;
+    for (let i = idx; i < next && i < buf.length; i++) { acc += buf[i]; n++; }
+    out[off] = n ? acc / n : 0;
+    off++; idx = next;
+  }
+  return out;
+}
+function ab2b64(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  return btoa(bin);
+}
+
+async function startMic() {
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, sampleRate: TARGET_SR, echoCancellation: true, noiseSuppression: true },
+      video: false,
+    });
+  } catch (e) {
+    alert('Microphone permission denied: ' + e.message);
+    return false;
+  }
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const srcRate = audioCtx.sampleRate;
+  micNode  = audioCtx.createMediaStreamSource(micStream);
+  // ScriptProcessor is deprecated but universally available with no module loader.
+  processor = audioCtx.createScriptProcessor(2048, 1, 1);
+  processor.onaudioprocess = (e) => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const f32 = e.inputBuffer.getChannelData(0);
+    const ds  = downsampleTo16k(f32, srcRate);
+    const pcm = pcm16FromFloat32(ds);
+    send({
+      kind: 'audio_chunk', type: 'audio_chunk',
+      channel: 'mic', sample_rate: TARGET_SR,
+      data: ab2b64(pcm.buffer), ts: Date.now(),
+    });
+  };
+  micNode.connect(processor);
+  processor.connect(audioCtx.destination);
+  statAudio.textContent = 'on';
+  micBtn.classList.add('active');
+  send({ kind: 'remote_audio_start', sample_rate: TARGET_SR, channels: 1 });
+  return true;
+}
+
+function stopMic() {
+  try { processor && processor.disconnect(); } catch(_){}
+  try { micNode   && micNode.disconnect(); }   catch(_){}
+  try { audioCtx  && audioCtx.close(); }       catch(_){}
+  try { micStream && micStream.getTracks().forEach(t => t.stop()); } catch(_){}
+  processor = null; micNode = null; audioCtx = null; micStream = null;
+  statAudio.textContent = 'off';
+  micBtn.classList.remove('active');
+  send({ kind: 'remote_audio_stop' });
+}
+micBtn.addEventListener('click', () => { if (micStream) stopMic(); else startMic(); });
+
+// ---------- Audio bar wiring ----------
+micMuteBtn.addEventListener('click', () => {
+  muteState.mic = !muteState.mic;
+  applyMuteUI('mic');
+  sendAudioMute('mic', muteState.mic);
+});
+speakerMuteBtn.addEventListener('click', () => {
+  muteState.system = !muteState.system;
+  applyMuteUI('system');
+  sendAudioMute('system', muteState.system);
+});
+refreshSourcesBtn.addEventListener('click', (e) => {
+  e.preventDefault(); e.stopPropagation();
+  sendAudioLevelSnap();
+});
+
+// ---------- Bootstrap ----------
+ctxToggles.querySelectorAll('.toggle').forEach(t => {
+  t.classList.toggle('on', !!cfg.contexts[t.dataset.ctx]);
+});
+$('#ask-mode').value = cfg.mode;
+applyMuteUI('mic');
+applyMuteUI('system');
+connect();
+})();
+</script>
+</body>
+</html>

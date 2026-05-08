@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sentinel Dashboard</title>
+<link rel="stylesheet" href="styles.css" />
+<script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <h1>🛰️ Sentinel Dashboard</h1>
+  <div class="conn">
+    <input id="host-input" type="text" placeholder="http://host:port" />
+    <input id="key-input"  type="password" placeholder="api key (optional)" />
+    <button class="primary" onclick="App.connect()">Connect</button>
+    <span class="pill dead" id="status-pill">disconnected</span>
+    <button class="icon-btn" id="mic-btn" title="Toggle microphone capture">🎙</button>
+  </div>
+</header>
+
+<main class="grid">
+  <section class="card">
+    <h2>📋 Pre-meeting curation</h2>
+    <label>Meeting ID
+      <input id="curate-meeting-id" type="text" placeholder="q3-roadmap-2026" />
+    </label>
+    <label>Goal
+      <textarea id="curate-goal" rows="2" placeholder="What do you want from this meeting?"></textarea>
+    </label>
+    <label>Persona
+      <textarea id="curate-persona" rows="2" placeholder="Tone, role, what to avoid…"></textarea>
+    </label>
+    <label>Docs (paste content; separate multiple docs with ---)
+      <textarea id="curate-docs" rows="6" placeholder="Inline docs…"></textarea>
+    </label>
+    <div class="row">
+      <button class="primary" onclick="App.curate()">Curate</button>
+      <button class="secondary" onclick="App.clearCurate()">Clear</button>
+    </div>
+    <pre id="curate-out" class="result">—</pre>
+  </section>
+
+  <section class="card">
+    <h2>🎙️ Live session monitor</h2>
+    <div class="row">
+      <label style="flex:1">Active session
+        <select id="session-select"><option value="">— pick session —</option></select>
+      </label>
+      <button class="secondary" id="refresh-sessions">↻</button>
+    </div>
+    <div class="row toggles" id="ctx-toggles">
+      <button class="toggle on" data-ctx="docs">docs</button>
+      <button class="toggle on" data-ctx="persona">persona</button>
+      <button class="toggle on" data-ctx="goal">goal</button>
+      <button class="toggle on" data-ctx="history">history</button>
+    </div>
+
+    <div class="audio-bar" id="audio-bar">
+      <button class="audio-btn active" id="mic-mute-btn" title="Mute / unmute the microphone capture stream">✅ Mic</button>
+      <button class="audio-btn active" id="speaker-mute-btn" title="Mute / unmute the system audio capture stream">✅ Speaker</button>
+      <div class="volume-meter" id="volume-meter" title="Live audio level">
+        <div class="volume-meter-fill" id="volume-fill"></div>
+      </div>
+    </div>
+
+    <details class="audio-sources-section" id="audio-sources-section">
+      <summary>
+        <span>Audio Sources</span>
+        <button class="src-refresh" id="refresh-sources-btn" title="Refresh source list">↻</button>
+      </summary>
+      <div class="audio-sources" id="audio-sources-list">
+        <div class="empty">No sources detected.</div>
+      </div>
+    </details>
+
+    <div class="row">
+      <select id="start-backend">
+        <option value="openai">openai (Realtime)</option>
+        <option value="grok">grok (xAI)</option>
+        <option value="assemblyai">assemblyai</option>
+        <option value="deepgram">deepgram</option>
+        <option value="gemini">gemini</option>
+        <option value="local">local</option>
+      </select>
+      <button class="primary" onclick="App.start()">Start</button>
+      <button class="danger"  onclick="App.stop()">Stop</button>
+    </div>
+    <pre id="state-out" class="result">no session</pre>
+    <h3>Live transcript</h3>
+    <div class="transcript" id="transcript">No transcript yet.</div>
+  </section>
+
+  <section class="card">
+    <h2>💡 Suggestions</h2>
+    <div class="row">
+      <input id="suggest-query" type="text" placeholder="Ask the copilot…" />
+      <select id="suggest-mode">
+        <option value="freeform">freeform</option>
+        <option value="talking_points">talking_points</option>
+        <option value="reply">reply</option>
+        <option value="recap">recap</option>
+        <option value="objection">objection</option>
+      </select>
+      <button class="primary" onclick="App.suggest()">Ask</button>
+    </div>
+    <div id="suggestions-feed" class="suggestions"><div class="empty">Awaiting…</div></div>
+  </section>
+
+  <section class="card">
+    <h2>🔎 History</h2>
+    <div class="row">
+      <input id="history-query" type="text" placeholder="Search past transcripts…" />
+      <button class="primary" onclick="App.history()">Search</button>
+    </div>
+    <pre id="history-out" class="result">—</pre>
+  </section>
+
+  <section class="card">
+    <h2>⚙︎ Settings</h2>
+    <label>Backend
+      <select id="cfg-backend">
+        <option value="openai">openai</option>
+        <option value="grok">grok</option>
+        <option value="assemblyai">assemblyai</option>
+        <option value="deepgram">deepgram</option>
+        <option value="gemini">gemini</option>
+        <option value="local">local</option>
+      </select>
+    </label>
+    <label>Audio source
+      <select id="cfg-audio-source">
+        <option value="auto">auto (rust if available, else python)</option>
+        <option value="rust">rust binary</option>
+        <option value="python">python sounddevice</option>
+        <option value="remote">remote (capture in browser)</option>
+      </select>
+    </label>
+    <label>VAD sensitivity
+      <input id="cfg-vad" type="range" min="0" max="100" value="50" />
+    </label>
+    <label>Default suggestion mode
+      <select id="cfg-mode">
+        <option value="freeform">freeform</option>
+        <option value="talking_points">talking_points</option>
+        <option value="reply">reply</option>
+        <option value="recap">recap</option>
+        <option value="objection">objection</option>
+      </select>
+    </label>
+    <div class="row">
+      <button class="primary" onclick="App.saveSettings()">Save</button>
+      <button class="secondary" onclick="App.openOverlay()">Open simple overlay ↗</button>
+    </div>
+    <pre id="settings-out" class="result">—</pre>
+  </section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

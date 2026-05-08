@@ -1,0 +1,55 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Hermes Sentinel",
+  "version": "1.0.0",
+  "identifier": "ai.hermes.sentinel",
+  "build": {
+    "beforeBuildCommand": "",
+    "beforeDevCommand": "",
+    "frontendDist": "../src",
+    "devUrl": "http://localhost:5173"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Sentinel",
+        "label": "main",
+        "url": "index.html",
+        "width": 380,
+        "height": 520,
+        "minWidth": 280,
+        "minHeight": 240,
+        "alwaysOnTop": true,
+        "transparent": true,
+        "decorations": false,
+        "resizable": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": true,
+        "focus": false
+      }
+    ],
+    "withGlobalTauri": true,
+    "security": {
+      "csp": "default-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:* https://* wss://*"
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true,
+      "tooltip": "Hermes Sentinel"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Productivity",
+    "shortDescription": "Stealth meeting copilot overlay",
+    "longDescription": "Always-on-top translucent overlay for the Hermes Sentinel meeting intelligence plugin. Hides from dock and taskbar; connects to a local or remote sentinel backend over WebSocket."
+  }
+}

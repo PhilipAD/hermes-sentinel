@@ -1,0 +1,55 @@
+name: sentinel
+version: 1.0.0
+hermes_version: ">=0.13.0 (Tenacity)"
+description: >
+  Always-on meeting intelligence plugin for Hermes Agent v0.13+. Dual-channel stealth
+  audio capture (system + mic), realtime backends (OpenAI Realtime, xAI Grok
+  Voice, AssemblyAI, Deepgram, Gemini Live, local), pre-meeting context curation,
+  instant contextual suggestions, post-meeting auto-extract + skill creation.
+  Turns any meeting into a context-aware, self-improving intelligence layer.
+author: PhilAD
+kind: standalone
+platforms:
+  - linux
+  - macos
+  - windows
+provides_tools:
+  - sentinel_curate      # Pre-meeting: load docs, set goal, run pre-brief
+  - sentinel_start       # Start live audio capture + backend stream
+  - sentinel_stop        # Stop capture and finalize
+  - sentinel_status      # Check live session state
+  - sentinel_suggest     # Request instant suggestions mid-meeting
+  - sentinel_post        # Run post-meeting extraction
+  - sentinel_history     # Search past meeting transcripts
+  - sentinel_overlay     # Show / hide / toggle / position the stealth overlay
+hooks:
+  - on_session_start
+  - on_session_end
+  - pre_llm_call
+dashboard_tabs:
+  - name: Sentinel Copilot
+    manifest: dashboard/manifest.json
+providers:
+  openai_realtime:
+    description: OpenAI Realtime API (text-only)
+    env_key: OPENAI_API_KEY
+    ws_url: wss://api.openai.com/v1/realtime
+  xai_grok:
+    description: xAI Grok Voice Agent
+    env_key: XAI_API_KEY
+    ws_url: wss://api.x.ai/v1/voice
+  assemblyai:
+    description: AssemblyAI Voice Agent
+    env_key: ASSEMBLYAI_API_KEY
+    ws_url: wss://api.assemblyai.com/v2/realtime
+  deepgram:
+    description: Deepgram Voice Agent (Nova-3)
+    env_key: DEEPGRAM_API_KEY
+    ws_url: wss://api.deepgram.com/v1/listen
+  gemini_live:
+    description: Google Gemini Live API
+    env_key: GEMINI_API_KEY
+    ws_url: wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService/BidiGenerateContent
+  local:
+    description: Local fallback (faster-whisper + Ollama)
+    no_api_key: true

@@ -1,0 +1,61 @@
+# ---------------------------------------------------------------------------
+# Hermes Sentinel — VCS ignores
+# ---------------------------------------------------------------------------
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.eggs/
+*.egg
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.venv/
+venv/
+env/
+ENV/
+build/
+dist/
+pip-wheel-metadata/
+
+# --- Rust ---
+rust-audio/target/
+rust-audio/Cargo.lock
+**/*.rs.bk
+
+# --- Tauri / Node ---
+tauri-overlay/src-tauri/target/
+tauri-overlay/dist/
+tauri-overlay/build/
+tauri-overlay/.tauri/
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.pnpm-store/
+*.tsbuildinfo
+
+# --- Plugin runtime data ---
+sentinel.yaml                   # user override config — keep example only
+transcripts/                    # captured meeting transcripts
+*.transcript.txt
+*.log
+.env
+.env.*
+!.env.example
+
+# --- Editors / OS ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

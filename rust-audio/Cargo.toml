@@ -1,0 +1,36 @@
+[package]
+name = "sentinel-audio"
+version = "1.0.0"
+edition = "2021"
+description = "Hermes Sentinel — dual-channel stealth audio capture (mic + system loopback) with VAD"
+authors = ["PhilAD <philipadsouza@gmail.com>"]
+license = "AGPL-3.0-only"
+repository = "https://github.com/philipadsouza/hermes-sentinel"
+
+[[bin]]
+name = "sentinel-audio"
+path = "src/main.rs"
+
+[dependencies]
+cpal = "0.15"
+hound = "3.5"
+ringbuf = "0.4"
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1.0"
+log = "0.4"
+env_logger = "0.11"
+byteorder = "1.5"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# pulseaudio loopback discovery is in cpal's "alsa" feature on Linux.
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# Windows uses WASAPI loopback via cpal's default backend.
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# macOS users need an aggregate device + BlackHole for system loopback.
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

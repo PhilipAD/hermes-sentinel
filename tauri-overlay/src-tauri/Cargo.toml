@@ -1,0 +1,28 @@
+[package]
+name = "sentinel-overlay"
+version = "1.0.0"
+edition = "2021"
+description = "Hermes Sentinel — stealth always-on-top overlay (Tauri wrapper around the web UI)"
+authors = ["PhilAD <philipadsouza@gmail.com>"]
+license = "AGPL-3.0-only"
+
+[lib]
+name = "sentinel_overlay_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "sentinel-overlay"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-shell = "2"
+tauri-plugin-dialog = "2"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]

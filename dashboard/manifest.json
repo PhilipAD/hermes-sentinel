@@ -1,0 +1,13 @@
+{
+  "name": "Sentinel Copilot",
+  "slug": "sentinel",
+  "version": "1.0.0",
+  "description": "Pre-meeting curation, live transcript, and history search — embedded in the Hermes dashboard.",
+  "entry": "dist/sentinel-tab.js",
+  "route": "/sentinel",
+  "icon": "🛰️",
+  "permissions": ["read:state", "write:tools"],
+  "external_assets": [
+    "https://unpkg.com/htmx.org@1.9.12"
+  ]
+}

@@ -1,0 +1,83 @@
+# Hermes Sentinel — example configuration.
+#
+# Copy this file to ~/.hermes/plugins/sentinel/sentinel.yaml (or
+# alongside plugin.yaml) and edit. Sentinel falls back to defaults for
+# any key you omit, so a minimal config that just sets a backend works.
+#
+# All API keys are read from environment variables — never paste keys in
+# this file. Recommended: keep them in ~/.env (loaded by Hermes at startup).
+
+version: "1.0.0"
+
+# Default realtime backend used by sentinel_start when no backend arg is given.
+# Options: openai | grok | assemblyai | deepgram | gemini | local
+realtime_backend: "openai"
+
+backends:
+  openai:
+    api_key_env: "OPENAI_API_KEY"
+    model: "gpt-4o-realtime-preview"
+    modalities: ["text"]
+    ws_url: "wss://api.openai.com/v1/realtime"
+
+  grok:
+    api_key_env: "XAI_API_KEY"
+    model: "grok-4.3"
+    ws_url: "wss://api.x.ai/v1/voice"
+
+  assemblyai:
+    api_key_env: "ASSEMBLYAI_API_KEY"
+    sample_rate: 16000
+    ws_url: "wss://api.assemblyai.com/v2/realtime"
+
+  deepgram:
+    api_key_env: "DEEPGRAM_API_KEY"
+    model: "nova-3"
+    ws_url: "wss://api.deepgram.com/v1/listen"
+
+  gemini:
+    api_key_env: "GEMINI_API_KEY"
+    model: "gemini-2.0-flash-exp"
+    ws_url: "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService/BidiGenerateContent"
+
+  local:
+    # No API key required. Requires faster-whisper + (optionally) Ollama.
+    whisper_model: "base"        # tiny | base | small | medium | large
+    ollama_url: "http://localhost:11434"
+    ollama_model: "llama3.2"
+
+audio:
+  source: "auto"                 # auto | rust | python
+  rust_binary_path: null          # auto-detect; set absolute path to override
+  channels: 2                     # 1 = mic only, 2 = mic + system loopback
+  sample_rate: 16000
+  chunk_ms: 20
+  vad_enabled: true
+
+overlay:
+  enabled: true
+  port: 18765
+  host: "127.0.0.1"               # set "0.0.0.0" to expose to LAN/WAN
+  api_key: ""                     # optional: require Authorization: Bearer <key>
+  ssl:
+    enabled: false                 # set true and fill paths for HTTPS / WSS
+    cert_path: ""
+    key_path: ""
+  websocket:
+    heartbeat_interval: 30
+
+stealth:
+  hide_from_dock: true
+  hide_from_taskbar: true
+  screenshot_proof: true          # tells the Tauri overlay to set screenshot-resistant flags
+  opacity: 0.85
+
+pre_meeting:
+  auto_compress: true
+  inject_persona: true
+  max_briefing_tokens: 2000
+
+post_meeting:
+  auto_extract_actions: true
+  auto_create_skills: false
+  save_to_yaowpedia: true
