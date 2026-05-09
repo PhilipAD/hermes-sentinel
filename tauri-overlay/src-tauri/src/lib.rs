@@ -84,6 +84,8 @@ pub fn run() {
 
             let icon = make_icon();
 
+            let icon_bytes = include_bytes!("../icons/icon.png");
+            let icon = Image::from_bytes(icon_bytes).expect("icon must be valid PNG");
             let _ = TrayIconBuilder::new()
                 .icon(icon)
                 .menu(&menu)
