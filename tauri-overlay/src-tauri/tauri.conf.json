@@ -37,7 +37,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -46,6 +49,12 @@
     ],
     "category": "Productivity",
     "shortDescription": "Stealth meeting copilot overlay",
-    "longDescription": "Always-on-top translucent overlay for the Hermes Sentinel meeting intelligence plugin."
+    "longDescription": "Always-on-top translucent overlay for the Hermes Sentinel meeting intelligence plugin.",
+    "resources": [
+      "remote-overlay/webui"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    }
   }
 }
