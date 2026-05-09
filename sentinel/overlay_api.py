@@ -512,17 +512,72 @@ def _build_app(cfg: SentinelConfig):
             ],
         }
 
-    # ---------------- WebSocket ----------------
+# ---------------- WebSocket ----------------
+# NOTE: The actual WS handler is the Starlette WSRt("/ws", _ws_raw) registered
+# at the bottom of this function. The @app.websocket decorator is kept as a
+# no-op stub so FastAPI's route discovery still sees it. The Starlette
+# WebSocketRoute is inserted directly into app.router.routes to bypass
+# FastAPI's APIWebSocketRoute dependency-injection wrapper which causes 403.
 
-    @app.websocket("/ws")
-    async def ws_endpoint(ws: WebSocket):
-        # Auth via subprotocol or query string for browser clients.
+@app.websocket("/ws")
+async def ws_endpoint(ws: WebSocket):
+    pass  # ← handled by _ws_raw below (FastAPI's decorator still registers the route)
+
+
+def _make_websocket_handler() -> None:
+    from starlette.routing import WebSocketRoute as WSRt
+
+    async def _ws_raw(ws: WebSocket) -> None:
+        import sys, logging
+        logging.getLogger("sentinel").warning(f"WS connected: api_key={repr(api_key)}")
+        sys.stderr.write(f"DEBUG WS: api_key={repr(api_key)}\n")
+        sys.stderr.flush()
+        if not api_key:
+            await ws.accept()
+            _WS_CLIENTS.add(ws)
+            client_id = id(ws)
+            _CLIENT_PREFS[client_id] = {
+                "session_id": None,
+                "contexts": {"docs": True, "persona": True, "goal": True, "history": True},
+                "settings": {},
+                "remote_audio": False,
+                "audio_sample_rate": 16000,
+            }
+            try:
+                state = current_state()
+                await ws.send_json({"kind": "status", "state": state.snapshot() if state else None})
+                await _send_sessions(ws)
+                while True:
+                    try:
+                        msg = await ws.receive_text()
+                    except WebSocketDisconnect:
+                        break
+                    try:
+                        obj = json.loads(msg)
+                    except Exception:
+                        continue
+                    kind = obj.get("kind", "")
+                    if kind == "ping":
+                        await ws.send_text(json.dumps({"kind": "pong"}))
+                    elif kind == "request_status":
+                        state2 = current_state()
+                        await ws.send_json({"kind": "status", "state": state2.snapshot() if state2 else None})
+                    elif kind == "list_sessions":
+                        await _send_sessions(ws)
+                    else:
+                        await _handle_client_message(ws, obj)
+            finally:
+                _WS_CLIENTS.discard(ws)
+                _CLIENT_PREFS.pop(client_id, None)
+            return
+
+        # Auth required path (identical logic for non-empty api_key)
         provided = ws.query_params.get("api_key")
         if not provided:
             auth_header = ws.headers.get("authorization", "")
             if auth_header.lower().startswith("bearer "):
                 provided = auth_header[7:].strip()
-        if api_key and provided != api_key:
+        if provided != api_key:
             await ws.close(code=4401)
             return
         await ws.accept()
@@ -536,8 +591,8 @@ def _build_app(cfg: SentinelConfig):
             "audio_sample_rate": 16000,
         }
         try:
-            # Send initial status so the client renders immediately.
-            await broadcast_status()
+            state = current_state()
+            await ws.send_json({"kind": "status", "state": state.snapshot() if state else None})
             await _send_sessions(ws)
             while True:
                 try:
@@ -548,12 +603,24 @@ def _build_app(cfg: SentinelConfig):
                     obj = json.loads(msg)
                 except Exception:
                     continue
-                await _handle_client_message(ws, obj)
+                kind = obj.get("kind", "")
+                if kind == "ping":
+                    await ws.send_text(json.dumps({"kind": "pong"}))
+                elif kind == "request_status":
+                    state2 = current_state()
+                    await ws.send_json({"kind": "status", "state": state2.snapshot() if state2 else None})
+                elif kind == "list_sessions":
+                    await _send_sessions(ws)
+                else:
+                    await _handle_client_message(ws, obj)
         finally:
             _WS_CLIENTS.discard(ws)
             _CLIENT_PREFS.pop(client_id, None)
 
-    # ---------------- Static UI ----------------
+    # Replace FastAPI's APIWebSocketRoute with Starlette's WebSocketRoute to
+    # bypass FastAPI's dependency-injection wrapper that was causing 403.
+    app.router.routes = [r for r in app.router.routes if not (hasattr(r, "path") and r.path == "/ws")]
+    app.router.routes.insert(0, WSRt("/ws", _ws_raw))
 
     # Mount AFTER WebSocket so /ws never matches StaticFiles fallthrough.
     # The root "/" route intercepts index.html before StaticFiles tries to
@@ -575,6 +642,7 @@ def _build_app(cfg: SentinelConfig):
                 return FileResponse(str(idx))
             return HTMLResponse("<h1>Hermes Sentinel</h1><p>Overlay UI not built.</p>")
 
+    _make_websocket_handler()
     return app
 
 
@@ -618,7 +686,7 @@ def ensure_overlay_server(cfg: SentinelConfig) -> bool:
                     host=cfg.overlay.host,
                     port=cfg.overlay.port,
                     log_level="warning",
-                    loop="asyncio",
+                    loop="auto",
                 )
                 server = uvicorn.Server(uv_cfg)
                 logger.info(
