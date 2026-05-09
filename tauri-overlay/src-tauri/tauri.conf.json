@@ -6,7 +6,7 @@
   "build": {
     "beforeBuildCommand": "",
     "beforeDevCommand": "",
-    "frontendDist": "../src",
+    "frontendDist": "../../remote-overlay/webui",
     "devUrl": "http://localhost:5173"
   },
   "app": {
@@ -26,17 +26,13 @@
         "skipTaskbar": true,
         "shadow": false,
         "visible": true,
-        "focus": false
+        "focus": false,
+        "center": true
       }
     ],
     "withGlobalTauri": true,
     "security": {
       "csp": "default-src 'self' 'unsafe-inline' http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:* https://* wss://*"
-    },
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": true,
-      "tooltip": "Hermes Sentinel"
     }
   },
   "bundle": {
@@ -50,6 +46,6 @@
     ],
     "category": "Productivity",
     "shortDescription": "Stealth meeting copilot overlay",
-    "longDescription": "Always-on-top translucent overlay for the Hermes Sentinel meeting intelligence plugin. Hides from dock and taskbar; connects to a local or remote sentinel backend over WebSocket."
+    "longDescription": "Always-on-top translucent overlay for the Hermes Sentinel meeting intelligence plugin."
   }
 }

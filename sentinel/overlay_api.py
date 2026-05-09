@@ -427,7 +427,7 @@ async def _handle_client_message(ws: Any, obj: Dict[str, Any]) -> None:
 
 def _build_app(cfg: SentinelConfig):
     """Build the FastAPI app. Imported lazily — fastapi may not be installed."""
-    from fastapi import FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+    from fastapi import FastAPI, Body, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
     from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
     from fastapi.staticfiles import StaticFiles
 
@@ -446,7 +446,7 @@ def _build_app(cfg: SentinelConfig):
                 provided = authorization
         if not provided and api_key_q:
             provided = api_key_q
-        if provided != api_key:
+        if api_key and provided != api_key:
             raise HTTPException(status_code=401, detail="invalid or missing api key")
 
     # ---------------- REST routes ----------------
@@ -462,12 +462,11 @@ def _build_app(cfg: SentinelConfig):
 
     @app.post("/api/sentinel/suggest")
     async def suggest(
-        request: Request,
+        body: Dict[str, Any] = Body(...),
         authorization: Optional[str] = Header(default=None),
         api_key_q: Optional[str] = Query(default=None, alias="api_key"),
     ):
         _check_auth(authorization, api_key_q)
-        body = await request.json()
         from sentinel.tools.handlers import handle_sentinel_suggest
         # Tool handlers are sync — run in the threadpool to avoid blocking
         # the overlay loop.
@@ -478,12 +477,11 @@ def _build_app(cfg: SentinelConfig):
 
     @app.post("/api/sentinel/overlay")
     async def overlay(
-        request: Request,
+        body: Dict[str, Any] = Body(...),
         authorization: Optional[str] = Header(default=None),
         api_key_q: Optional[str] = Query(default=None, alias="api_key"),
     ):
         _check_auth(authorization, api_key_q)
-        body = await request.json()
         return await overlay_command(body.get("action", "toggle"), body.get("position"))
 
     @app.get("/api/sentinel/transcript")
