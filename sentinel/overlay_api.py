@@ -427,8 +427,8 @@ async def _handle_client_message(ws: Any, obj: Dict[str, Any]) -> None:
 
 def _build_app(cfg: SentinelConfig):
     """Build the FastAPI app. Imported lazily — fastapi may not be installed."""
-    from fastapi import FastAPI, Body, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
-    from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+    from fastapi import FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+    from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, RedirectResponse
     from fastapi.staticfiles import StaticFiles
 
     app = FastAPI(title="Hermes Sentinel Overlay", version="1.0.0")
@@ -462,14 +462,14 @@ def _build_app(cfg: SentinelConfig):
 
     @app.post("/api/sentinel/suggest")
     async def suggest(
-        body: Dict[str, Any] = Body(...),
         authorization: Optional[str] = Header(default=None),
         api_key_q: Optional[str] = Query(default=None, alias="api_key"),
+        body: dict = None,
     ):
         _check_auth(authorization, api_key_q)
         from sentinel.tools.handlers import handle_sentinel_suggest
-        # Tool handlers are sync — run in the threadpool to avoid blocking
-        # the overlay loop.
+        if body is None:
+            raise HTTPException(status_code=400, detail="request body required")
         result_str = await asyncio.get_running_loop().run_in_executor(
             None, lambda: handle_sentinel_suggest(body)
         )
@@ -477,11 +477,13 @@ def _build_app(cfg: SentinelConfig):
 
     @app.post("/api/sentinel/overlay")
     async def overlay(
-        body: Dict[str, Any] = Body(...),
         authorization: Optional[str] = Header(default=None),
         api_key_q: Optional[str] = Query(default=None, alias="api_key"),
+        body: dict = None,
     ):
         _check_auth(authorization, api_key_q)
+        if body is None:
+            raise HTTPException(status_code=400, detail="request body required")
         return await overlay_command(body.get("action", "toggle"), body.get("position"))
 
     @app.get("/api/sentinel/transcript")
@@ -553,10 +555,18 @@ def _build_app(cfg: SentinelConfig):
 
     # ---------------- Static UI ----------------
 
+    # Mount AFTER WebSocket so /ws never matches StaticFiles fallthrough.
+    # The root "/" route intercepts index.html before StaticFiles tries to
+    # serve it as a plain file.
+
     if _REMOTE_OVERLAY_DIR.is_dir():
         webui = _REMOTE_OVERLAY_DIR / "webui"
         if webui.is_dir():
             app.mount("/webui", StaticFiles(directory=str(webui), html=True), name="webui")
+
+            @app.get("/webui", response_class=RedirectResponse)
+            async def webui_index():
+                return RedirectResponse(url="/webui/", status_code=302)
 
         @app.get("/", response_class=HTMLResponse)
         async def root_index():
